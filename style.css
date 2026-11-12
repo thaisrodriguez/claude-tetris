@@ -146,6 +146,29 @@ body {
   border-color: var(--accent);
 }
 
+/* ---- Skins ---- */
+.skin-select {
+  background: var(--board-bg);
+  color: var(--text);
+  border: 1px solid var(--board-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.skin-select:hover {
+  border-color: var(--accent);
+}
+
+/* Neon fuerza fondo oscuro aunque el tema sea claro */
+[data-skin="neon"] #board,
+[data-skin="neon"] #next-canvas {
+  background: #000;
+  border-color: #1f2a44;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
@@ -226,3 +249,128 @@ kbd {
 #restart-btn:hover {
   background: var(--accent-hover);
 }
+
+.pause-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 190px;
+}
+
+.pause-menu.hidden,
+.pause-controls.hidden,
+#restart-btn.hidden {
+  display: none;
+}
+
+.menu-btn {
+  background: var(--kbd-bg);
+  color: var(--kbd-text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+.menu-btn.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+
+.menu-btn:hover {
+  filter: brightness(1.1);
+}
+
+.pause-controls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  text-align: left;
+  color: var(--kbd-text);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.level-select {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--kbd-text);
+}
+
+.level-select select {
+  background: var(--kbd-bg);
+  color: var(--kbd-text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+/* ---- Records ---- */
+#overlay-title.start { color: var(--accent); }
+
+.name-form { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.name-form.hidden, .records.hidden, #reset-records-btn.hidden { display: none; }
+.name-row { display: flex; gap: 6px; }
+#name-input {
+  width: 130px;
+  background: var(--board-bg);
+  color: var(--text);
+  border: 1px solid var(--board-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  user-select: text;
+}
+#name-input:focus { outline: none; border-color: var(--accent); }
+#save-btn {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.records { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+#records-list {
+  list-style: none;
+  width: 260px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+}
+#records-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+#records-list li.me {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+#records-list li.empty { justify-content: center; }
+#records-extra { font-size: 12px; color: var(--muted); }
+
+#reset-records-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--board-border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+#reset-records-btn:hover { border-color: var(--danger); color: var(--danger); }

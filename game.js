@@ -4,6 +4,7 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
+// Paleta retro (por defecto). Los índices 1–7 coinciden con PIECES; cada skin define su propio colors[] con el mismo orden.
 const COLORS = [
   null,
   '#4dd0e1', // I - cyan
@@ -26,6 +27,84 @@ const PIECES = [
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
 ];
 
+// ---- Skins ----
+function skinRect(context, x, y, w, h, radius) {
+  context.beginPath();
+  if (radius && context.roundRect) context.roundRect(x, y, w, h, radius);
+  else context.rect(x, y, w, h);
+}
+
+const SKINS = {
+  retro: {
+    colors: COLORS,
+    boardBg: null, // usa el fondo del tema (CSS)
+    grid: null,    // usa --grid del tema
+    drawBlock(context, x, y, colorIndex, size) {
+      context.fillStyle = this.colors[colorIndex];
+      context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+    },
+  },
+  neon: {
+    colors: [null, '#00f0ff', '#fff700', '#d400ff', '#39ff14', '#ff1744', '#4d6bff', '#ff9100'],
+    boardBg: '#000000',
+    grid: '#1a1a2a',
+    drawBlock(context, x, y, colorIndex, size) {
+      const color = this.colors[colorIndex];
+      context.shadowColor = color;
+      context.shadowBlur = 12;
+      context.fillStyle = color;
+      context.fillRect(x * size + 3, y * size + 3, size - 6, size - 6);
+      context.shadowBlur = 0;
+      context.shadowColor = 'transparent';
+      context.fillStyle = 'rgba(255,255,255,0.35)';
+      context.fillRect(x * size + 3, y * size + 3, size - 6, 3);
+    },
+  },
+  pastel: {
+    colors: [null, '#a8e6ef', '#fff1b0', '#d9b8f0', '#b8e6c1', '#f5b5b5', '#b5bdf0', '#ffd5a8'],
+    boardBg: null,
+    grid: null,
+    drawBlock(context, x, y, colorIndex, size) {
+      context.fillStyle = this.colors[colorIndex];
+      skinRect(context, x * size + 1.5, y * size + 1.5, size - 3, size - 3, size * 0.28);
+      context.fill();
+      context.strokeStyle = 'rgba(90,70,110,0.45)';
+      context.lineWidth = 1.5;
+      skinRect(context, x * size + 1.5, y * size + 1.5, size - 3, size - 3, size * 0.28);
+      context.stroke();
+      context.fillStyle = 'rgba(255,255,255,0.35)';
+      skinRect(context, x * size + 5, y * size + 4, size - 10, 4, 2);
+      context.fill();
+    },
+  },
+  pixel: {
+    colors: [null, '#29c5d6', '#f2c02e', '#9b4fc9', '#4caf50', '#d84a4a', '#4a5fc9', '#f08a24'],
+    boardBg: null,
+    grid: null,
+    drawBlock(context, x, y, colorIndex, size) {
+      const px = x * size, py = y * size;
+      const u = (size - 2) / 6; // celda de textura 6x6
+      context.fillStyle = this.colors[colorIndex];
+      context.fillRect(px + 1, py + 1, size - 2, size - 2);
+      for (let i = 0; i < 6; i++) {
+        for (let j = 0; j < 6; j++) {
+          if ((i + j) % 2 === 0) continue; // ajedrezado
+          context.fillStyle = (i < 3 && j < 3) ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.2)';
+          context.fillRect(px + 1 + i * u, py + 1 + j * u, u, u);
+        }
+      }
+      context.strokeStyle = 'rgba(0,0,0,0.55)';
+      context.lineWidth = 1;
+      context.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+    },
+  },
+};
+
+const SKIN_KEY = 'tetris-skin';
+let skinName = 'retro';
+
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
 const canvas = document.getElementById('board');
@@ -39,16 +118,50 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const controlsBtn = document.getElementById('controls-btn');
+const pauseControls = document.getElementById('pause-controls');
+const startLevelSel = document.getElementById('start-level');
+const nameForm = document.getElementById('name-form');
+const nameInput = document.getElementById('name-input');
+const recordsBox = document.getElementById('records');
+const recordsList = document.getElementById('records-list');
+const recordsExtra = document.getElementById('records-extra');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
 const themeBtn = document.getElementById('theme-btn');
 const themeIcon = document.getElementById('theme-icon');
 const themeText = document.getElementById('theme-text');
+const skinSelect = document.getElementById('skin-select');
 
 const THEME_KEY = 'tetris-theme';
 let gridColor = '#22222e';
 
+function updateGridColor() {
+  gridColor = SKINS[skinName].grid
+    || getComputedStyle(document.documentElement).getPropertyValue('--grid').trim()
+    || gridColor;
+}
+
+function applySkin(name) {
+  if (!Object.hasOwn(SKINS, name)) name = 'retro';
+  skinName = name;
+  document.documentElement.dataset.skin = name;
+  skinSelect.value = name;
+  updateGridColor();
+  if (board && current) { draw(); drawNext(); } // redibuja también en pausa
+}
+
+function loadSkin() {
+  let saved = null;
+  try { saved = localStorage.getItem(SKIN_KEY); } catch (_) {}
+  return Object.hasOwn(SKINS, saved) ? saved : 'retro';
+}
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || gridColor;
+  updateGridColor();
   const isDark = theme === 'dark';
   themeIcon.textContent = isDark ? '☀️' : '🌙';
   themeText.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
@@ -61,7 +174,74 @@ function loadTheme() {
   return saved === 'light' ? 'light' : 'dark'; // oscuro por defecto
 }
 
+let started = false, combo = 0, comboBest = 0, records, lastEntry = null;
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let startLevel = 1;   // nivel base de la partida en curso
+let pendingLevel = 1; // elegido en el menú de pausa; se aplica en init()
+
+function intervalFor(lvl) { return Math.max(100, 1000 - (lvl - 1) * 90); }
+
+// ---- Records ----
+const RECORDS_KEY = 'tetris-records';
+const MAX_RECORDS = 5;
+
+function emptyRecords() {
+  return { top: [], bestCombo: 0, maxLines: 0 };
+}
+
+function loadRecords() {
+  const rec = emptyRecords();
+  try {
+    const data = JSON.parse(localStorage.getItem(RECORDS_KEY));
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.top)) {
+        rec.top = data.top
+          .filter(e => e && Number.isFinite(e.score))
+          .map(e => ({ name: String(e.name ?? '').slice(0, 12), score: e.score, lines: Number(e.lines) || 0, date: String(e.date ?? '') }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, MAX_RECORDS);
+      }
+      rec.bestCombo = Number(data.bestCombo) || 0;
+      rec.maxLines = Number(data.maxLines) || 0;
+    }
+  } catch (_) {}
+  return rec;
+}
+
+function saveRecords() {
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); } catch (_) {}
+}
+
+function qualifies(sc) {
+  return sc > 0 && (records.top.length < MAX_RECORDS || sc > records.top[records.top.length - 1].score);
+}
+
+function renderRecords() {
+  recordsList.textContent = '';
+  if (!records.top.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'Sin records todavía';
+    recordsList.appendChild(li);
+  }
+  records.top.forEach((e, i) => {
+    const li = document.createElement('li');
+    if (e === lastEntry) li.className = 'me';
+    const left = document.createElement('span');
+    left.textContent = `${i + 1}. ${e.name}`;
+    const right = document.createElement('span');
+    right.textContent = `${e.score.toLocaleString()} · ${e.lines}L`;
+    li.append(left, right);
+    recordsList.appendChild(li);
+  });
+  recordsExtra.textContent = `Mejor combo: ${records.bestCombo} · Líneas máx.: ${records.maxLines}`;
+}
+
+function showRecords(show) {
+  recordsBox.classList.toggle('hidden', !show);
+  resetRecordsBtn.classList.toggle('hidden', !show);
+  if (show) renderRecords();
+}
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -127,10 +307,11 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    level = startLevel + Math.floor(lines / 10);
+    dropInterval = intervalFor(level);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -158,7 +339,12 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  if (clearLines() > 0) {
+    combo++;
+    comboBest = Math.max(comboBest, combo);
+  } else {
+    combo = 0;
+  }
   spawn();
 }
 
@@ -179,13 +365,8 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  SKINS[skinName].drawBlock(context, x, y, colorIndex, size);
   context.globalAlpha = 1;
 }
 
@@ -243,20 +424,39 @@ function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
+  overlayTitle.classList.remove('start');
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  pauseMenu.classList.add('hidden');
+  records.bestCombo = Math.max(records.bestCombo, comboBest);
+  records.maxLines = Math.max(records.maxLines, lines);
+  saveRecords();
+  lastEntry = null;
+  restartBtn.textContent = 'Reiniciar';
+  showRecords(true);
+  if (qualifies(score)) {
+    nameInput.value = 'Jugador';
+    nameForm.classList.remove('hidden');
+  }
   overlay.classList.remove('hidden');
+  if (!nameForm.classList.contains('hidden')) { nameInput.focus(); nameInput.select(); }
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    overlay.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    restartBtn.classList.add('hidden');
+    pauseMenu.classList.remove('hidden');
+    pauseControls.classList.add('hidden');
+    controlsBtn.setAttribute('aria-expanded', 'false');
+    startLevelSel.value = String(pendingLevel);
     overlay.classList.remove('hidden');
   }
 }
@@ -274,30 +474,53 @@ function loop(ts) {
     }
   }
   draw();
-  animId = requestAnimationFrame(loop);
+  if (!gameOver) animId = requestAnimationFrame(loop);
 }
 
 function init() {
+  started = true;
+  combo = 0;
+  comboBest = 0;
+  lastEntry = null;
+  nameForm.classList.add('hidden');
+  showRecords(false);
+  overlayTitle.classList.remove('start');
+  restartBtn.textContent = 'Reiniciar';
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  startLevel = pendingLevel;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = intervalFor(level);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  pauseMenu.classList.add('hidden');
+  restartBtn.classList.remove('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  if (e.target === skinSelect) return; // select enfocado: no mover piezas ni pausar
+  if (e.target instanceof HTMLInputElement) return; // escribiendo el nombre
+  if (!started) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (!e.repeat) togglePause();
+    return;
+  }
+  if (paused) {
+    // con el menú abierto, evita que Space/Enter/flechas activen botones o hagan scroll
+    if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)
+        && e.target.tagName !== 'SELECT' && e.target.tagName !== 'BUTTON') e.preventDefault();
+    return;
+  }
+  if (gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -320,7 +543,49 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+skinSelect.addEventListener('change', () => {
+  try { localStorage.setItem(SKIN_KEY, skinSelect.value); } catch (_) {}
+  applySkin(skinSelect.value);
+  skinSelect.blur(); // evita que Space/flechas cambien el select durante el juego
+});
+
+restartBtn.addEventListener('click', () => { restartBtn.blur(); init(); });
+
+nameForm.addEventListener('submit', e => {
+  e.preventDefault();
+  if (!gameOver || nameForm.classList.contains('hidden')) return;
+  const name = nameInput.value.trim().slice(0, 12) || 'Jugador';
+  lastEntry = { name, score, lines, date: new Date().toISOString().slice(0, 10) };
+  records.top.push(lastEntry);
+  records.top.sort((a, b) => b.score - a.score);
+  records.top = records.top.slice(0, MAX_RECORDS);
+  saveRecords();
+  nameForm.classList.add('hidden');
+  nameInput.blur();
+  renderRecords();
+});
+
+resetRecordsBtn.addEventListener('click', () => {
+  resetRecordsBtn.blur();
+  if (!confirm('¿Borrar todos los records?')) return;
+  records = emptyRecords();
+  lastEntry = null;
+  saveRecords();
+  renderRecords();
+});
+
+for (let i = 1; i <= 15; i++) startLevelSel.add(new Option(i, i));
+resumeBtn.addEventListener('click', () => { resumeBtn.blur(); togglePause(); });
+pauseRestartBtn.addEventListener('click', () => { pauseRestartBtn.blur(); init(); });
+controlsBtn.addEventListener('click', () => {
+  const open = pauseControls.classList.toggle('hidden') === false;
+  controlsBtn.setAttribute('aria-expanded', String(open));
+  controlsBtn.blur();
+});
+startLevelSel.addEventListener('change', () => {
+  pendingLevel = Number(startLevelSel.value); // se aplica al reiniciar
+  startLevelSel.blur();
+});
 
 themeBtn.addEventListener('click', () => {
   const nextTheme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
@@ -329,6 +594,10 @@ themeBtn.addEventListener('click', () => {
   themeBtn.blur(); // evita que Space/Enter reactiven el botón durante el juego
 });
 
+applySkin(loadSkin());
 applyTheme(loadTheme());
 
-init();
+// Pantalla de inicio: el juego arranca al pulsar Jugar
+records = loadRecords();
+overlayTitle.classList.add('start');
+showRecords(true);
